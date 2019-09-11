@@ -11,6 +11,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace SystemTrayClock
 {
@@ -42,45 +44,61 @@ namespace SystemTrayClock
 
         private void SystemTrayClock_Load(object sender, EventArgs e)
         {
-            //取得系统托盘时间区域。
-            IntPtr taskBarWnd = FindWindow("Shell_TrayWnd", null);
-            IntPtr tray = FindWindowEx(taskBarWnd, IntPtr.Zero, "TrayNotifyWnd", null);
-            IntPtr trayclock = FindWindowEx(tray, IntPtr.Zero, "TrayClockWClass", null);
-  
-            WindowRect rect = new WindowRect();
-            GetWindowRect(trayclock, out rect);
-            
-            int trayclock_width = (Screen.PrimaryScreen.Bounds.Width - rect.left) - (Screen.PrimaryScreen.Bounds.Width - rect.right);
-            int trayclock_height = (Screen.PrimaryScreen.Bounds.Height - rect.top) - (Screen.PrimaryScreen.Bounds.Height - rect.bottom);
-
-            this.ShowInTaskbar = false;
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
-            this.Height = trayclock_height;
-            this.Width = trayclock_width;
-            this.TopMost = true;
-            int x = rect.left; 
-            int y = rect.top; 
-            this.Location = new Point(x, y);
-            string url = "http://t.weather.sojson.com/api/weather/city/101070201";
-            //屏蔽 显示桌面与win+D。
-            Thread mustTop = new Thread(() =>
+            try
             {
-                while (!this.IsDisposed)
+                //取得系统托盘时间区域。
+                IntPtr taskBarWnd = FindWindow("Shell_TrayWnd", null);
+                IntPtr tray = FindWindowEx(taskBarWnd, IntPtr.Zero, "TrayNotifyWnd", null);
+                IntPtr trayclock = FindWindowEx(tray, IntPtr.Zero, "TrayClockWClass", null);
+
+                WindowRect rect = new WindowRect();
+                GetWindowRect(trayclock, out rect);
+
+                int trayclock_width = (Screen.PrimaryScreen.Bounds.Width - rect.left) - (Screen.PrimaryScreen.Bounds.Width - rect.right);
+                int trayclock_height = (Screen.PrimaryScreen.Bounds.Height - rect.top) - (Screen.PrimaryScreen.Bounds.Height - rect.bottom);
+
+                this.ShowInTaskbar = false;
+                this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
+                this.Height = trayclock_height;
+                this.Width = trayclock_width;
+                this.TopMost = true;
+                int x = rect.left;
+                int y = rect.top;
+                this.Location = new Point(x, y);
+                //屏蔽 显示桌面与win+D。
+                Thread mustTop = new Thread(() =>
                 {
-                    this.Invoke(new Action(() =>
+                    while (!this.IsDisposed)
                     {
-                        this.TopMost = true;
-                        this.lblTime.Text = DateTime.Now.ToString("HH:mm MM/dd"); 
-                    }));
-                }
-            });
-            mustTop.Start();
+                        this.Invoke(new Action(() =>
+                        {
+                            this.TopMost = true;
+                            this.lblTime.Text = DateTime.Now.ToString("HH:mm MM/dd");
+                        }));
+                    }
+                });
+                mustTop.Start();
+            }
+            catch (Exception ex)
+            { 
+
+            }
 
         }
 
         private void SystemTrayClock_FormClosing(object sender, FormClosingEventArgs e)
         {
 
+        }
+
+        private void getWeatherInfo()
+        {
+            string url = "http://t.weather.sojson.com/api/weather/city/101070201";
+            string res = DoGetRequestSendData(url);
+            JObject jo = (JObject)JsonConvert.DeserializeObject(res);
+            string temperature = jo["data"]["wendu"].ToString();
+            string weatherInfo = jo["data"]["forecast"][0]["fx"].ToString() + " " + jo["data"]["forecast"][0]["type"].ToString();
+            this.lblWeather.Text = temperature + "℃" + " " + jo["data"]["forecast"][0]["type"].ToString();
         }
 
         private string DoGetRequestSendData(string url)
@@ -103,7 +121,7 @@ namespace SystemTrayClock
             try
             {
                 hwResponse = (HttpWebResponse)hwRequest.GetResponse();
-                StreamReader srReader = new StreamReader(hwResponse.GetResponseStream(), Encoding.ASCII);
+                StreamReader srReader = new StreamReader(hwResponse.GetResponseStream(), Encoding.UTF8);
                 strResult = srReader.ReadToEnd();
                 srReader.Close();
                 hwResponse.Close();
@@ -115,7 +133,12 @@ namespace SystemTrayClock
             return strResult;
         }
 
+        private void 退出ToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            //this.IsDisposed = false;
+            System.Environment.Exit(0); 
+        }
+
     }
 }
 
-```C#
